@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | StudySync Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
+        .nav-sidebar { background: #1e293b; padding: 20px; border-radius: 15px; display: flex; justify-content: space-around; margin-bottom: 25px; border: 1px solid #334155; }
+        .nav-item { cursor: pointer; font-weight: bold; color: #94a3b8; transition: 0.3s; padding: 10px 20px; border-radius: 8px; }
+        .nav-item.active { background: #38bdf8; color: #000; }
+        .nav-item:hover { color: #38bdf8; }
+
+        /* Profile Card */
+        .profile-card { background: #1e293b; padding: 30px; border-radius: 20px; display: flex; align-items: center; gap: 30px; border: 1px solid #334155; text-align: left; }
+        .avatar-large { width: 100px; height: 100px; background: #38bdf8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #000; font-weight: bold; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4); }
+        
+        /* Material Library */
+        .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+        .book-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: left; position: relative; }
+        .book-card h4 { color: #38bdf8; margin: 0 0 10px 0; }
+        .download-btn { background: #00ff88; color: #000; padding: 5px 12px; border-radius: 5px; text-decoration: none; font-size: 0.8rem; font-weight: bold; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #38bdf8; margin: 0;">StudySync Pro 🎓</h2>
+        <button onclick="logout()" class="btn" style="background: #ef4444; color: white; padding: 5px 15px;">Logout</button>
+    </div>
+
+    <div class="nav-sidebar">
+        <div class="nav-item active" id="btn-profile" onclick="showTab('profile')">👤 My Profile</div>
+        <div class="nav-item" id="btn-room" onclick="showTab('room')">🏠 Study Room</div>
+        <div class="nav-item" id="btn-lib" onclick="showTab('lib')">📚 Library</div>
+    </div>
+
+    <div id="section-profile" class="tab-content">
+        <div class="profile-card">
+            <div class="avatar-large" id="user-initial">S</div>
+            <div>
+                <h1 id="user-display-name" style="margin: 0;">Loading...</h1>
+                <p id="user-display-email" style="color: #94a3b8; margin: 5px 0;"></p>
+                <div style="margin-top: 10px;">
+                    <span id="user-display-subject" style="background: #334155; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; border: 1px solid #38bdf8;">Subject: BCA</span>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: left; background: #111827; padding: 20px; border-radius: 15px;">
+            <h3>Academic Status</h3>
+            <p>Welcome back! You are currently connected to the <b>Global Study Hub</b>. You can share notes or chat with strangers in the Study Room.</p>
+        </div>
+    </div>
+
+    <div id="section-room" class="tab-content hidden">
+        <div class="grid-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left;">
+            <div class="panel" style="background: #1e293b; padding: 20px; border-radius: 15px;">
+                <h3>🟢 Active Students</h3>
+                <div id="active-list" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
+                <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
+                <button class="btn primary-btn" onclick="findStranger()">🤝 Find Stranger Mate</button>
+                <p id="mate-status" style="color: #00ff88; margin-top: 10px;"></p>
+            </div>
+            <div class="panel" style="background: #1e293b; padding: 20px; border-radius: 15px;">
+                <h3>📤 Quick Share</h3>
+                <p style="font-size: 0.9rem; color: #94a3b8;">Upload notes here to share with everyone.</p>
+                <input type="file" id="fileShare" onchange="handleFileUpload(this)">
+            </div>
+        </div>
+    </div>
+
+    <div id="section-lib" class="tab-content hidden">
+        <h3 style="text-align: left;">📚 Available Study Material</h3>
+        <div class="library-grid" id="library-container">
+            <div class="book-card">
+                <h4>Syllabus_BCA.pdf</h4>
+                <p style="font-size: 0.7rem; color: #64748b;">Uploaded by: System</p>
+                <a href="#" class="download-btn">Download</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="swami-footer">made by <b>swami shankar</b></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    
+    // Check local storage for user data (set during auth)
+    const userData = JSON.parse(localStorage.getItem('studySyncUser'));
+    
+    if(!userData) {
+        window.location.href = "index.html"; // Redirect if not logged in
+    }
+
+    // Initialize Profile
+    document.getElementById('user-display-name').innerText = userData.name;
+    document.getElementById('user-display-email').innerText = userData.email;
+    document.getElementById('user-display-subject').innerText = "Subject: " + userData.subject;
+    document.getElementById('user-initial').innerText = userData.name[0].toUpperCase();
+
+    // Notify server about joining
+    socket.emit('join-study', { user: userData.email, subject: userData.subject });
+
+    // Tab Switching
+    function showTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById('section-' + tab).classList.remove('hidden');
+        document.getElementById('btn-' + tab).classList.add('active');
+    }
+
+    function logout() {
+        localStorage.removeItem('studySyncUser');
+        window.location.href = "index.html";
+    }
+
+    // Logic for Online Students & Files...
+    socket.on('status-update', (list) => {
+        const div = document.getElementById('active-list');
+        div.innerHTML = list.map(u => `<span style="border: 1px solid #00ff88; padding: 2px 10px; border-radius: 15px; font-size: 0.8rem;">${u.name.split('@')[0]}</span>`).join('');
+    });
+
+    function handleFileUpload(input) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = () => socket.emit('share-file', { name: file.name, data: reader.result });
+        reader.readAsDataURL(file);
+    }
+
+    socket.on('receive-file', (f) => {
+        const container = document.getElementById('library-container');
+        container.innerHTML += `
+            <div class="book-card">
+                <h4>${f.name}</h4>
+                <p style="font-size: 0.7rem; color: #64748b;">Uploaded by: ${f.sender}</p>
+                <a href="${f.data}" download="${f.name}" class="download-btn">Download</a>
+            </div>`;
+    });
+
+    function findStranger() { socket.emit('find-stranger'); }
+    socket.on('stranger-found', (m) => { document.getElementById('mate-status').innerText = "Matched with " + m.name.split('@')[0] + "!"; });
+</script>
+</body>
+</html>
